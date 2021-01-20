@@ -1,0 +1,16 @@
+[package]
+name = "sneak"
+version = "0.1.0"
+authors = ["vteremasov <vit@teremasov.me>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+regex = "1.4.3"
+tui = "0.14.0"
+termion = "1.5.5"
+rand = "0.8.2"
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+serde_json = "1.0.61"
+serde = "1.0.120"
