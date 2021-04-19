@@ -1,10 +1,10 @@
+use rayon::prelude::*;
 use regex::Regex;
-use std::ffi::OsString;
 use std::fs;
-use std::fs::{DirEntry, FileType};
-use std::path::{Path, PathBuf};
+use std::fs::DirEntry;
+use std::path::Path;
 
-use crate::lib::types::Issue;
+use crate::lib::types::{CodeLine, Issue};
 
 pub fn is_excluded(path: &Path) -> bool {
     // TODO: Read excluded paths from .gitignores
@@ -25,40 +25,56 @@ pub fn list_files(path: &Path) -> Vec<DirEntry> {
         }
         if path.is_dir() {
             result.extend(list_files(&path));
-        } else {
+        } else if path.is_file() {
             result.push(entry);
+        } else {
+            continue;
         }
     }
 
     result
 }
 
-pub fn search_in_file(path: &Path) -> Vec<String> {
-    let pattern: Regex = Regex::new("(.*)TODO:(.*)").unwrap();
+pub fn search_in_file(path: &Path) -> Vec<CodeLine> {
+    let pattern: Regex = Regex::new("[//|#|;;]\\s*TODO:(?P<TEXT>.+)").unwrap();
     let content = fs::read_to_string(path).unwrap();
 
     content
         .lines()
-        .filter(|line| pattern.is_match(line))
-        .map(|line| String::from(line))
+        .enumerate()
+        .map(|(idx, line)| CodeLine {
+            number: idx as u64 + 1,
+            text: String::from(line),
+        })
+        .filter(|line| pattern.is_match(&line.text))
         .collect()
+}
+
+pub fn is_reported(todo: &str) -> bool {
+    let pattern: Regex = Regex::new("[//|#|;;]\\s*TODO(?P<REPORT>\\(reported:\\s*(http(s)?://.*\\.[\\w]+(\\?.*)?)\\)):(?P<TEXT>.+)").unwrap();
+    pattern.is_match(todo)
 }
 
 pub fn get_todo_issues(path: &Path) -> Vec<Issue> {
     let files = list_files(path);
-    let mut result = vec![];
-    for file in files {
-        let todos = search_in_file(file.path().as_path());
 
-        for todo in todos {
-            result.push(Issue {
-                file_path: file.path(),
-                file_name: String::from(file.file_name().to_str().unwrap()),
-                file_type: file.file_type().unwrap(),
-                todo,
-            })
-        }
-    }
-
-    result
+    files
+        .par_iter()
+        .map(|file| {
+            search_in_file(file.path().as_path())
+                .iter()
+                .map(|todo| Issue {
+                    file_path: file.path(),
+                    file_name: String::from(
+                        file.file_name()
+                            .to_str()
+                            .unwrap_or(file.path().to_str().unwrap_or_default()),
+                    ),
+                    line: todo.clone(),
+                    reported: is_reported(&todo.text),
+                })
+                .collect::<Vec<Issue>>()
+        })
+        .flatten()
+        .collect()
 }
