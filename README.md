@@ -1,6 +1,6 @@
 # Sneak
 
-![workflow](https://github.com/vteremasov/sneak/actions/workflows/rust/badge.svg)
+![workflow](https://github.com/vteremasov/sneak/actions/workflows/Rust/badge.svg)
 
 **Sneak** is a cli tool to report todos in your code into pivotaltracker stories
 
