@@ -65,11 +65,7 @@ pub fn get_todo_issues(path: &Path) -> Vec<Issue> {
                 .iter()
                 .map(|todo| Issue {
                     file_path: file.path(),
-                    file_name: String::from(
-                        file.file_name()
-                            .to_str()
-                            .unwrap_or(file.path().to_str().unwrap_or_default()),
-                    ),
+                    file_name: String::from(file.file_name().to_str().unwrap_or_default()),
                     line: todo.clone(),
                     reported: is_reported(&todo.text),
                 })

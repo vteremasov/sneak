@@ -8,9 +8,7 @@ edition = "2018"
 
 [dependencies]
 regex = "1.4.3"
-tui = "0.14.0"
-termion = "1.5.5"
-rand = "0.8.2"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
-serde_json = "1.0.61"
-serde = "1.0.120"
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+rayon = "1.5.0"
