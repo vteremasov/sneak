@@ -30,5 +30,5 @@ pub fn count_starting_whitespaces(string: &str) -> u32 {
         }
     }
 
-    return result;
+    result
 }
