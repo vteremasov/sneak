@@ -6,29 +6,32 @@ use std::path::Path;
 
 use crate::lib::types::{CodeLine, Issue};
 
-pub fn is_excluded(path: &Path) -> bool {
+pub fn is(path: &Path, patterns: Vec<Regex>) -> bool {
     // TODO: Read excluded paths from .gitignores
-    // TODO: Read excluded paths from command params
-    path.ends_with(".gitignore")
-        || path.ends_with("target")
-        || path.ends_with(".git")
-        || path.ends_with(".idea")
+    let path_str = path.to_str().unwrap();
+
+    for p in patterns.clone() {
+        if p.is_match(path_str) {
+            return true;
+        }
+    }
+
+    false
 }
 
-pub fn list_files(path: &Path) -> Vec<DirEntry> {
+pub fn list_files(path: &Path, excluded: Vec<Regex>, included: Vec<Regex>) -> Vec<DirEntry> {
+    // TODO: get rid of unwraps here
     let mut result = vec![];
     for entry in fs::read_dir(path).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path().clone();
-        if is_excluded(&path) {
+        if is(&path, excluded.clone()) && !is(&path, included.clone()) {
             continue;
         }
         if path.is_dir() {
-            result.extend(list_files(&path));
+            result.extend(list_files(&path, excluded.clone(), included.clone()));
         } else if path.is_file() {
             result.push(entry);
-        } else {
-            continue;
         }
     }
 
@@ -56,7 +59,13 @@ pub fn is_reported(todo: &str) -> bool {
 }
 
 pub fn get_todo_issues(path: &Path) -> Vec<Issue> {
-    let files = list_files(path);
+    let mut excluded = vec![
+        Regex::new(".*\\.git$").unwrap(),
+        Regex::new(".*\\.idea$").unwrap(),
+    ];
+    excluded.extend(list_excludes(path, git_exclude));
+    let included = list_excludes(path, git_include);
+    let files = list_files(path, excluded, included);
 
     files
         .par_iter()
@@ -73,4 +82,72 @@ pub fn get_todo_issues(path: &Path) -> Vec<Issue> {
         })
         .flatten()
         .collect()
+}
+
+fn git_exclude(line: &&str) -> bool {
+    let string = String::from(*line);
+    !string.starts_with('#') && !string.starts_with('!')
+}
+
+fn git_include(line: &&str) -> bool {
+    let string = String::from(*line);
+    string.starts_with('!')
+}
+
+fn list_excludes(path: &Path, filter_out: fn(line: &&str) -> bool) -> Vec<Regex> {
+    let excl = vec![Regex::new(".*").unwrap()];
+    let incl = vec![Regex::new(".*\\.gitignore").unwrap()];
+    let git_ignores = list_files(path, excl, incl);
+
+    let mut result = vec![];
+
+    for file in git_ignores {
+        result.extend(
+            fs::read_to_string(file.path().as_path())
+                .unwrap()
+                .lines()
+                .filter(filter_out)
+                .map(gitignore_pattern_to_reg)
+                .map(|s| Regex::new(&s).unwrap())
+                .collect::<Vec<Regex>>(),
+        )
+    }
+
+    result
+}
+
+fn gitignore_pattern_to_reg(pattern: &str) -> String {
+    String::from(pattern)
+        .split("")
+        .map(|el| match el {
+            "*" => String::from(".*"),
+            "?" => String::from("."),
+            "." | "\\" | "(" | ")" => String::from("\\") + el,
+            _ => String::from(el),
+        })
+        .collect::<Vec<String>>()
+        .join("")
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use regex;
+
+    #[test]
+    fn test_gitignore_pattern_to_reg() {
+        assert_eq!(gitignore_pattern_to_reg("*"), String::from(".*"));
+        assert_eq!(
+            gitignore_pattern_to_reg("asdf?asdf"),
+            String::from("asdf.asdf")
+        );
+        assert_eq!(
+            gitignore_pattern_to_reg("**/*.js"),
+            String::from(".*.*/.*\\.js")
+        );
+
+        assert!(regex::Regex::new(&gitignore_pattern_to_reg("**/*.js"))
+            .unwrap()
+            .is_match("test/test/test.js"));
+    }
 }
