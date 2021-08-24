@@ -21,13 +21,13 @@ jobs:
     - name: Build
       run: make build
       
-  build-windows:
-
-    runs-on: windows10
-
-    steps:
-    - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+#  build-windows:
+#
+#    runs-on: windows10
+#
+#    steps:
+#    - uses: actions/checkout@v2
+#    - name: Build
+#      run: cargo build --verbose
+#    - name: Run tests
+#      run: cargo test --verbose
